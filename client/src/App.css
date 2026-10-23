@@ -10,7 +10,8 @@ body {
   background: #fffdf7;
 }
 
-button, input {
+button,
+input {
   font: inherit;
 }
 
@@ -41,8 +42,10 @@ nav {
   gap: 12px;
 }
 
-nav button, .filters button {
-  background: transparent;
+nav button,
+.filters button {
+  background: white;
+  color: #26352a;
   border: 1px solid #e6e3d8;
   border-radius: 20px;
   padding: 9px 15px;
@@ -51,9 +54,11 @@ nav button, .filters button {
 .hero {
   padding: 55px 8%;
   background: #f1f5e9;
+  text-align: center;
 }
 
-.eyebrow, .restaurant {
+.eyebrow,
+.restaurant {
   color: #66805b;
   font-size: 12px;
   font-weight: bold;
@@ -62,14 +67,21 @@ nav button, .filters button {
 
 .hero h1 {
   max-width: 600px;
+  margin: 12px auto;
+  color: #26352a;
   font-size: clamp(30px, 5vw, 48px);
-  margin: 12px 0;
+}
+
+.hero > p:not(.eyebrow) {
+  color: #465348;
 }
 
 .hero input {
   width: min(100%, 440px);
   padding: 14px;
   margin-top: 14px;
+  color: #26352a;
+  background: white;
   border: 1px solid #d9ddcf;
   border-radius: 10px;
 }
@@ -78,29 +90,37 @@ nav button, .filters button {
   padding: 30px 7%;
 }
 
+.menu h2 {
+  color: #26352a;
+  text-align: center;
+}
+
 .filters {
   display: flex;
   flex-wrap: wrap;
+  justify-content: center;
   gap: 10px;
   margin: 18px 0 25px;
 }
 
-.filters .active {
+.filters button.active {
   background: #315c3b;
   color: white;
 }
 
 .food-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
   gap: 18px;
 }
 
 .food-card {
+  min-width: 0;
+  overflow: hidden;
   background: white;
   border: 1px solid #e9e6db;
   border-radius: 14px;
-  overflow: hidden;
+  text-align: center;
 }
 
 .food-emoji {
@@ -117,6 +137,7 @@ nav button, .filters button {
 
 .food-info h3 {
   margin: 8px 0;
+  color: #26352a;
 }
 
 .restaurant {
@@ -124,6 +145,7 @@ nav button, .filters button {
 }
 
 .price {
+  color: #26352a;
   font-weight: bold;
 }
 
@@ -133,6 +155,11 @@ nav button, .filters button {
   padding: 11px 16px;
   background: #315c3b;
   color: white;
+}
+
+.primary:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
 }
 
 .cart-row {
@@ -153,6 +180,31 @@ nav button, .filters button {
 
 .quantity button {
   padding: 5px 12px;
+  cursor: pointer;
+}
+
+.food-card-quantity {
+  justify-content: center;
+  gap: 18px;
+  margin-top: 8px;
+}
+
+.food-card-quantity button {
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border: 1px solid #315c3b;
+  border-radius: 8px;
+  background: #315c3b;
+  color: white;
+  font-size: 20px;
+  line-height: 1;
+}
+
+.food-card-quantity span {
+  min-width: 16px;
+  text-align: center;
+  font-weight: bold;
 }
 
 footer {
@@ -175,43 +227,83 @@ footer {
     padding: 8px;
   }
 
-  .hero, .menu {
+  .hero,
+  .menu {
     padding: 28px 18px;
+  }
+
+  .food-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+  }
+
+  .food-info {
+    padding: 12px 8px;
+  }
+
+  .food-info h3 {
+    font-size: 16px;
   }
 }
 
-/* Visibility fixes */
-.navbar nav button {
+.orders-page > h1 {
   color: #26352a;
-  background: #fff;
+  margin-top: 24px;
 }
 
-.hero h1 {
-  color: #26352a;
+.orders-list {
+  display: grid;
+  gap: 16px;
+  max-width: 760px;
+  margin: 24px auto;
 }
 
-.hero > p:not(.eyebrow) {
+.order-card {
+  padding: 20px;
+  background: white;
+  border: 1px solid #e9e6db;
+  border-radius: 14px;
+}
+
+.order-card p {
+  color: #465348;
+  margin: 10px 0;
+}
+
+.order-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.order-status {
+  padding: 5px 10px;
+  border-radius: 20px;
+  background: #f1f5e9;
+  color: #315c3b;
+  font-size: 13px;
+  text-transform: capitalize;
+}
+
+
+.order-items {
+  margin: 16px 0;
+  padding-top: 12px;
+  border-top: 1px solid #e9e6db;
+}
+
+.order-item-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 8px 0;
   color: #465348;
 }
 
-.menu h2 {
+.order-total {
+  display: block;
+  margin-top: 12px;
   color: #26352a;
-}
-
-.filters button {
-  color: #26352a;
-  background: #fff;
-}
-
-.filters button.active {
-  color: #fff;
-  background: #315c3b;
-}
-
-.food-info h3 {
-  color: #26352a;
-}
-
-.food-info .price {
-  color: #26352a;
+  text-align: right;
 }
