@@ -227,6 +227,7 @@ app.post("/api/orders", (req, res) => {
                             `INSERT INTO Delivery
                              (order_id, delivery_status)
                              VALUES (?, 'Preparing')`,
+                            [orderId],
                             (deliveryError) => {
                               if (deliveryError) return fail(deliveryError);
 
@@ -329,6 +330,318 @@ app.get("/api/orders", (req, res) => {
 
     res.json([...orderMap.values()]);
   });
+});
+
+
+/* =========================================
+   EAT RITE: Nutrition analysis for an order
+========================================= */
+app.get("/api/eat-rite/:orderId", (req, res) => {
+  const orderId = Number(req.params.orderId);
+  const customerId = Number(req.query.customer_id || 1);
+
+  if (
+    !Number.isInteger(orderId) ||
+    orderId <= 0 ||
+    !Number.isInteger(customerId) ||
+    customerId <= 0
+  ) {
+    return res.status(400).json({
+      error: "Invalid order ID or customer ID"
+    });
+  }
+
+  const sql = `
+    SELECT
+      o.order_id,
+      o.customer_id,
+      o.order_date,
+      o.total_amount,
+      o.status,
+      fi.food_id,
+      fi.food_name,
+      oi.quantity,
+      n.serving_size_g,
+      n.calories,
+      n.protein_g,
+      n.carbohydrates_g,
+      n.fat_g,
+      n.fibre_g,
+      n.sugar_g,
+      n.sodium_mg
+    FROM Orders o
+    JOIN Order_Item oi ON o.order_id = oi.order_id
+    JOIN Food_Item fi ON oi.food_id = fi.food_id
+    LEFT JOIN Food_Nutrition n ON fi.food_id = n.food_id
+    WHERE o.order_id = ?
+      AND o.customer_id = ?
+    ORDER BY fi.food_name
+  `;
+
+  db.query(sql, [orderId, customerId], (err, rows) => {
+    if (err) {
+      console.error("Eat Rite query failed:", err.message);
+      return res.status(500).json({
+        error: "Could not analyse this order"
+      });
+    }
+
+    if (rows.length === 0) {
+      return res.status(404).json({
+        error: "Order not found for this customer"
+      });
+    }
+
+    const missingNutrition = rows.filter(
+      (row) => row.calories === null
+    );
+
+    const totals = {
+      calories: 0,
+      protein_g: 0,
+      carbohydrates_g: 0,
+      fat_g: 0,
+      fibre_g: 0,
+      sugar_g: 0,
+      sodium_mg: 0,
+      serving_size_g: 0
+    };
+
+    const items = rows.map((row) => {
+      const quantity = Number(row.quantity);
+      const hasNutrition = row.calories !== null;
+
+      const nutrition = {};
+
+      for (const key of [
+        "calories",
+        "protein_g",
+        "carbohydrates_g",
+        "fat_g",
+        "fibre_g",
+        "sugar_g",
+        "sodium_mg",
+        "serving_size_g"
+      ]) {
+        nutrition[key] = hasNutrition
+          ? Number(row[key]) * quantity
+          : null;
+
+        if (hasNutrition) {
+          totals[key] += nutrition[key];
+        }
+      }
+
+      return {
+        food_id: row.food_id,
+        food_name: row.food_name,
+        quantity,
+        serving_size_g: hasNutrition
+          ? Number(row.serving_size_g)
+          : null,
+        nutrition,
+        nutrition_available: hasNutrition
+      };
+    });
+
+    const insights = [];
+
+    if (totals.fibre_g < 5) {
+      insights.push(
+        "This order is relatively low in fibre. Consider adding vegetables, fruit, or another fibre-rich food."
+      );
+    }
+
+    if (totals.protein_g < 15) {
+      insights.push(
+        "Consider adding a protein-rich food, such as beans, lentils, eggs, tofu, or paneer."
+      );
+    }
+
+    if (totals.sodium_mg > 1500) {
+      insights.push(
+        "This order has a high estimated sodium content. Consider choosing less salty options next time."
+      );
+    }
+
+    if (totals.sugar_g > 25) {
+      insights.push(
+        "This order contains a substantial amount of estimated sugar. You could balance it with a less sugary option."
+      );
+    }
+
+    if (insights.length === 0) {
+      insights.push(
+        "Consider your overall daily diet, portion sizes, and variety when deciding how this order fits your eating habits."
+      );
+    }
+
+    res.json({
+      success: true,
+      order: {
+        order_id: rows[0].order_id,
+        order_date: rows[0].order_date,
+        total_amount: Number(rows[0].total_amount),
+        status: rows[0].status
+      },
+      nutrition_basis: "Estimated values for project demonstration",
+      nutrition_complete: missingNutrition.length === 0,
+      items,
+      totals: Object.fromEntries(
+        Object.entries(totals).map(([key, value]) => [
+          key,
+          Math.round(value * 100) / 100
+        ])
+      ),
+      insights
+    });
+  });
+});
+
+
+
+ // Admin dashboard statistics
+app.get("/api/admin/stats", (req, res) => {
+  const sql = `
+    SELECT
+      (SELECT COUNT(*) FROM Orders) AS total_orders,
+      (SELECT COALESCE(SUM(total_amount), 0) FROM Orders) AS total_revenue,
+      (SELECT COUNT(*) FROM Customer) AS total_customers,
+      (SELECT COUNT(*) FROM Food_Item) AS total_food_items,
+      (SELECT COUNT(*) FROM Food_Item WHERE availability = TRUE)
+        AS available_food_items,
+      (SELECT COUNT(*) FROM Orders WHERE status = 'Placed')
+        AS placed_orders
+  `;
+
+  db.query(sql, (err, results) => {
+    if (err) {
+      console.error("Admin stats query failed:", err.message);
+      return res.status(500).json({
+        error: "Could not load admin dashboard statistics"
+      });
+    }
+
+    const stats = results[0];
+
+    res.json({
+      total_orders: Number(stats.total_orders),
+      total_revenue: Number(stats.total_revenue),
+      total_customers: Number(stats.total_customers),
+      total_food_items: Number(stats.total_food_items),
+      available_food_items: Number(stats.available_food_items),
+      placed_orders: Number(stats.placed_orders)
+    });
+  });
+});
+
+
+ // Sales and analytics reports
+app.get("/api/admin/analytics", (req, res) => {
+  const queries = {
+    summary: `
+      SELECT
+        COUNT(*) AS total_orders,
+        COALESCE(SUM(total_amount), 0) AS total_order_value,
+        COALESCE(AVG(total_amount), 0) AS average_order_value
+      FROM Orders
+    `,
+
+    dailySales: `
+      SELECT
+        DATE(order_date) AS sale_date,
+        COUNT(*) AS order_count,
+        COALESCE(SUM(total_amount), 0) AS revenue
+      FROM Orders
+      WHERE order_date >= DATE_SUB(CURDATE(), INTERVAL 6 DAY)
+        AND order_date < DATE_ADD(CURDATE(), INTERVAL 1 DAY)
+      GROUP BY DATE(order_date)
+      ORDER BY sale_date ASC
+    `,
+
+    topFoods: `
+      SELECT
+        fi.food_id,
+        fi.food_name,
+        COALESCE(SUM(oi.quantity), 0) AS quantity_sold,
+        COALESCE(SUM(oi.quantity * oi.price), 0) AS sales_value
+      FROM Order_Item oi
+      JOIN Food_Item fi ON oi.food_id = fi.food_id
+      GROUP BY fi.food_id, fi.food_name
+      ORDER BY quantity_sold DESC, sales_value DESC
+      LIMIT 5
+    `,
+
+    restaurantSales: `
+      SELECT
+        r.restaurant_id,
+        r.restaurant_name,
+        COUNT(DISTINCT o.order_id) AS order_count,
+        COALESCE(SUM(o.total_amount), 0) AS sales_value
+      FROM Restaurant r
+      LEFT JOIN Orders o ON r.restaurant_id = o.restaurant_id
+      GROUP BY r.restaurant_id, r.restaurant_name
+      ORDER BY sales_value DESC
+    `
+  };
+
+  const results = {};
+  const entries = Object.entries(queries);
+  let completed = 0;
+  let failed = false;
+
+  for (const [key, sql] of entries) {
+    db.query(sql, (err, rows) => {
+      if (failed) return;
+
+      if (err) {
+        failed = true;
+        console.error(`Analytics query failed (${key}):`, err.message);
+
+        return res.status(500).json({
+          error: "Could not load sales analytics",
+          section: key
+        });
+      }
+
+      results[key] = rows;
+      completed += 1;
+
+      if (completed === entries.length) {
+        res.json({
+          summary: {
+            total_orders: Number(results.summary[0].total_orders),
+            total_order_value: Number(
+              results.summary[0].total_order_value
+            ),
+            average_order_value: Number(
+              results.summary[0].average_order_value
+            )
+          },
+
+          daily_sales: results.dailySales.map((row) => ({
+            sale_date: row.sale_date,
+            order_count: Number(row.order_count),
+            revenue: Number(row.revenue)
+          })),
+
+          top_foods: results.topFoods.map((row) => ({
+            food_id: row.food_id,
+            food_name: row.food_name,
+            quantity_sold: Number(row.quantity_sold),
+            sales_value: Number(row.sales_value)
+          })),
+
+          restaurant_sales: results.restaurantSales.map((row) => ({
+            restaurant_id: row.restaurant_id,
+            restaurant_name: row.restaurant_name,
+            order_count: Number(row.order_count),
+            sales_value: Number(row.sales_value)
+          }))
+        });
+      }
+    });
+  }
 });
 
 // Start the backend server
